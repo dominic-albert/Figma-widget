@@ -1,52 +1,66 @@
 "use client"
 
-// ---------------------------------------------------------------------------
-// PREVIEW SAFETY: create a very small mock `figma` global when we’re NOT
-// inside the Figma widget runtime so the code can run in the browser preview.
-// ---------------------------------------------------------------------------
 import React from "react"
 
-if (typeof window !== "undefined" && typeof (globalThis as any).figma === "undefined") {
+/* --------------------------------------------------------------------
+   BROWSER-ONLY STUB ─ lets Next.js preview render without the real
+   Figma runtime.  When the widget actually runs in Figma this block
+   is skipped because `window` is undefined in that sandbox.
+---------------------------------------------------------------------*/
+if (
+  typeof window !== "undefined" && // we're in a browser
+  typeof (globalThis as any).figma === "undefined"
+) {
   ;(globalThis as any).figma = {
-    // Minimal widget-API surface needed for the preview
     widget: {
       useSyncedState: <T,>(_: string, initial: T) => React.useState<T>(initial),
       usePropertyMenu: () => {},
-      AutoLayout: (props: any) => (
+      /* Very small visual shims so components still render in preview */
+      AutoLayout: ({
+        direction,
+        spacing = 4,
+        padding = 0,
+        fill,
+        stroke,
+        strokeWidth,
+        cornerRadius,
+        width,
+        onClick,
+        children,
+      }: any) => (
         <div
           style={{
             display: "flex",
-            flexDirection: props.direction === "horizontal" ? "row" : "column",
-            gap: props.spacing ?? 4,
-            padding: props.padding ?? 0,
-            background: props.fill,
-            border: props.stroke ? `${props.strokeWidth ?? 1}px solid ${props.stroke}` : undefined,
-            borderRadius: props.cornerRadius ?? 0,
-            width: props.width === "fill-parent" ? "100%" : props.width,
+            flexDirection: direction === "horizontal" ? "row" : "column",
+            gap: spacing,
+            padding,
+            background: fill,
+            border: stroke ? `${strokeWidth ?? 1}px solid ${stroke}` : undefined,
+            borderRadius: cornerRadius,
+            width: width === "fill-parent" ? "100%" : width,
           }}
-          onClick={props.onClick}
+          onClick={onClick}
         >
-          {props.children}
+          {children}
         </div>
       ),
-      Text: (props: any) => (
-        <span
-          style={{
-            fontSize: props.fontSize,
-            fontWeight: props.fontWeight,
-            color: props.fill,
-          }}
-          onClick={props.onClick}
-        >
-          {props.children}
+      Text: ({ fontSize, fontWeight, fill, onClick, children }: any) => (
+        <span style={{ fontSize, fontWeight, color: fill }} onClick={onClick}>
+          {children}
         </span>
       ),
-      Input: (props: any) => (
+      Input: ({ value, placeholder, fontSize, onTextEditEnd }: any) => (
         <input
-          style={{ fontSize: props.fontSize, padding: 4, border: "1px solid #d1d5db", borderRadius: 4, width: "100%" }}
-          value={props.value}
-          placeholder={props.placeholder}
-          onChange={(e) => props.onTextEditEnd({ characters: e.target.value })}
+          style={{
+            fontSize,
+            padding: 4,
+            border: "1px solid #d1d5db",
+            borderRadius: 4,
+            width: "100%",
+          }}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onTextEditEnd?.({ characters: e.target.value })}
         />
       ),
     },
@@ -56,9 +70,11 @@ if (typeof window !== "undefined" && typeof (globalThis as any).figma === "undef
   }
 }
 
-// @ts-ignore
-const { widget } = (globalThis as any).figma
-const { useSyncedState, usePropertyMenu, AutoLayout, Text, Input, SVG, Frame } = widget
+// Declare figma as a global variable to avoid linting errors when running outside of Figma
+declare var figma: any
+
+const { widget } = figma
+const { useSyncedState, usePropertyMenu, AutoLayout, Text, Input } = widget
 
 interface LogEntry {
   id: string
@@ -67,7 +83,7 @@ interface LogEntry {
   author: string
   date: string
   nodeId?: string
-  data: any
+  data: Record<string, string>
   color: string
 }
 
@@ -107,13 +123,12 @@ const CATEGORY_CONFIG = {
 function Widget() {
   const [entries, setEntries] = useSyncedState<LogEntry[]>("entries", [])
   const [isExpanded, setIsExpanded] = useSyncedState("isExpanded", false)
-  const [selectedType, setSelectedType] = useSyncedState<string>("selectedType", "")
+  const [selectedType, setSelectedType] = useSyncedState("selectedType", "")
   const [isCreating, setIsCreating] = useSyncedState("isCreating", false)
-  const [filterType, setFilterType] = useSyncedState<string>("filterType", "all")
+  const [filterType, setFilterType] = useSyncedState("filterType", "all")
   const [searchQuery, setSearchQuery] = useSyncedState("searchQuery", "")
-  const [formData, setFormData] = useSyncedState<any>("formData", {})
+  const [formData, setFormData] = useSyncedState<Record<string, string>>("formData", {})
 
-  // Property menu for quick actions
   usePropertyMenu(
     [
       {
@@ -151,8 +166,8 @@ function Widget() {
       },
     ],
     ({ propertyName }) => {
-      if (propertyName?.startsWith("add-")) {
-        const type = propertyName.replace("add-", "") as keyof typeof CATEGORY_CONFIG
+      if (propertyName && propertyName.startsWith("add-")) {
+        const type = propertyName.replace("add-", "")
         startCreating(type)
       } else if (propertyName === "export") {
         exportEntries()
@@ -160,25 +175,28 @@ function Widget() {
     },
   )
 
-  const startCreating = (type: keyof typeof CATEGORY_CONFIG) => {
+  function startCreating(type: string) {
     setSelectedType(type)
     setIsCreating(true)
     setIsExpanded(true)
     setFormData({})
   }
 
-  const saveEntry = () => {
-    if (!formData.title?.trim()) return
+  function saveEntry() {
+    if (!formData.title || !formData.title.trim()) return
+
+    const config = CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG]
+    if (!config) return
 
     const newEntry: LogEntry = {
       id: Date.now().toString(),
-      type: selectedType as any,
+      type: selectedType as LogEntry["type"],
       title: formData.title,
       author: figma.currentUser?.name || "Unknown",
       date: new Date().toLocaleDateString(),
       nodeId: figma.currentPage.selection[0]?.id,
       data: { ...formData },
-      color: CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG].color,
+      color: config.color,
     }
 
     setEntries([...entries, newEntry])
@@ -186,14 +204,35 @@ function Widget() {
     setFormData({})
   }
 
-  const exportEntries = () => {
-    const exportData = entries.map((entry) => ({
-      ...entry,
-      category: CATEGORY_CONFIG[entry.type].label,
-    }))
+  function exportEntries() {
+    figma.notify(`Exported ${entries.length} entries`)
+  }
 
-    figma.notify(`Exported ${entries.length} entries to clipboard`)
-    // In a real implementation, you'd copy to clipboard or download
+  function getFieldPlaceholder(field: string): string {
+    const placeholders: Record<string, string> = {
+      title: "Enter title...",
+      description: "Describe the decision...",
+      reasoning: "Why was this decision made?",
+      status: "Proposed/Approved/Reversed",
+      research: "Link to research or reference",
+      constraints: "Technical, business, or time constraints",
+      persona: "Which user or goal is impacted?",
+      problem: "Summarize the problem",
+      severity: "Low/Medium/High",
+      fix: "Suggested solution",
+      assignee: "Who should fix this?",
+      task: "What task or flow was observed?",
+      behavior: "What behavior or blocker occurred?",
+      quote: "User quote (optional)",
+      improvement: "Suggested improvement",
+      worked_on: "What did you work on today?",
+      decisions: "Key decisions made",
+      feedback: "Feedback received",
+      blockers: "Frictions or blockers encountered",
+      next_steps: "What are the next steps?",
+      reflection: "Personal reflection",
+    }
+    return placeholders[field] || "Enter value..."
   }
 
   const filteredEntries = entries.filter((entry) => {
@@ -260,7 +299,6 @@ function Widget() {
       cornerRadius={8}
       width={400}
     >
-      {/* Header */}
       <AutoLayout direction="horizontal" spacing={8} width="fill-parent">
         <Text fontSize={16} fontWeight={600}>
           UX Documentation Hub
@@ -272,7 +310,6 @@ function Widget() {
         </AutoLayout>
       </AutoLayout>
 
-      {/* Search and Filter */}
       <AutoLayout direction="vertical" spacing={8} width="fill-parent">
         <Input
           value={searchQuery}
@@ -290,7 +327,7 @@ function Widget() {
         />
 
         <AutoLayout direction="horizontal" spacing={4} width="fill-parent">
-          {["all", ...Object.keys(CATEGORY_CONFIG)].map((type) => (
+          {["all", "decision", "rationale", "debt", "insight", "journal"].map((type) => (
             <AutoLayout
               key={type}
               padding={{ horizontal: 8, vertical: 4 }}
@@ -303,29 +340,28 @@ function Widget() {
                 fill={filterType === type ? "#FFFFFF" : "#374151"}
                 fontWeight={filterType === type ? 600 : 400}
               >
-                {type === "all" ? "All" : CATEGORY_CONFIG[type as keyof typeof CATEGORY_CONFIG].icon}
+                {type === "all" ? "All" : CATEGORY_CONFIG[type as keyof typeof CATEGORY_CONFIG]?.icon || type}
               </Text>
             </AutoLayout>
           ))}
         </AutoLayout>
       </AutoLayout>
 
-      {/* Create New Entry */}
       {isCreating && (
         <AutoLayout direction="vertical" spacing={8} width="fill-parent" padding={12} fill="#F9FAFB" cornerRadius={6}>
           <AutoLayout direction="horizontal" spacing={8} width="fill-parent">
             <Text fontSize={14} fontWeight={600}>
-              {CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG]?.icon}{" "}
-              {CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG]?.label}
+              {CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG]?.icon || ""}{" "}
+              {CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG]?.label || ""}
             </Text>
           </AutoLayout>
 
-          {/* Dynamic Form Fields */}
           {selectedType &&
+            CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG] &&
             CATEGORY_CONFIG[selectedType as keyof typeof CATEGORY_CONFIG].fields.map((field) => (
               <AutoLayout key={field} direction="vertical" spacing={4} width="fill-parent">
                 <Text fontSize={11} fill="#374151" fontWeight={500}>
-                  {field.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                  {field.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                 </Text>
                 <Input
                   value={formData[field] || ""}
@@ -364,7 +400,6 @@ function Widget() {
         </AutoLayout>
       )}
 
-      {/* Add New Button */}
       {!isCreating && (
         <AutoLayout direction="horizontal" spacing={4} width="fill-parent">
           {Object.entries(CATEGORY_CONFIG).map(([type, config]) => (
@@ -373,7 +408,7 @@ function Widget() {
               padding={{ horizontal: 8, vertical: 6 }}
               fill={config.color}
               cornerRadius={4}
-              onClick={() => startCreating(type as keyof typeof CATEGORY_CONFIG)}
+              onClick={() => startCreating(type)}
             >
               <Text fontSize={10} fill="#FFFFFF">
                 {config.icon}
@@ -383,7 +418,6 @@ function Widget() {
         </AutoLayout>
       )}
 
-      {/* Entries List */}
       <AutoLayout direction="vertical" spacing={8} width="fill-parent">
         {filteredEntries.map((entry) => (
           <AutoLayout
@@ -398,7 +432,7 @@ function Widget() {
             cornerRadius={6}
           >
             <AutoLayout direction="horizontal" spacing={8} width="fill-parent">
-              <Text fontSize={12}>{CATEGORY_CONFIG[entry.type].icon}</Text>
+              <Text fontSize={12}>{CATEGORY_CONFIG[entry.type]?.icon || ""}</Text>
               <AutoLayout direction="vertical" spacing={2} width="fill-parent">
                 <Text fontSize={12} fontWeight={600}>
                   {entry.title}
@@ -409,22 +443,20 @@ function Widget() {
               </AutoLayout>
             </AutoLayout>
 
-            {/* Entry Details */}
             <AutoLayout direction="vertical" spacing={4} width="fill-parent">
-              {Object.entries(entry.data).map(
-                ([key, value]) =>
-                  value &&
-                  key !== "title" && (
-                    <AutoLayout key={key} direction="vertical" spacing={2} width="fill-parent">
-                      <Text fontSize={9} fill="#374151" fontWeight={500}>
-                        {key.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}:
-                      </Text>
-                      <Text fontSize={9} fill="#6B7280">
-                        {String(value)}
-                      </Text>
-                    </AutoLayout>
-                  ),
-              )}
+              {Object.entries(entry.data).map(([key, value]) => {
+                if (!value || key === "title") return null
+                return (
+                  <AutoLayout key={key} direction="vertical" spacing={2} width="fill-parent">
+                    <Text fontSize={9} fill="#374151" fontWeight={500}>
+                      {key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}:
+                    </Text>
+                    <Text fontSize={9} fill="#6B7280">
+                      {String(value)}
+                    </Text>
+                  </AutoLayout>
+                )
+              })}
             </AutoLayout>
           </AutoLayout>
         ))}
@@ -441,37 +473,10 @@ function Widget() {
   )
 }
 
-function getFieldPlaceholder(field: string): string {
-  const placeholders: Record<string, string> = {
-    title: "Enter title...",
-    description: "Describe the decision...",
-    reasoning: "Why was this decision made?",
-    status: "Proposed/Approved/Reversed",
-    research: "Link to research or reference",
-    constraints: "Technical, business, or time constraints",
-    persona: "Which user or goal is impacted?",
-    problem: "Summarize the problem",
-    severity: "Low/Medium/High",
-    fix: "Suggested solution",
-    assignee: "Who should fix this?",
-    task: "What task or flow was observed?",
-    behavior: "What behavior or blocker occurred?",
-    quote: "User quote (optional)",
-    improvement: "Suggested improvement",
-    worked_on: "What did you work on today?",
-    decisions: "Key decisions made",
-    feedback: "Feedback received",
-    blockers: "Frictions or blockers encountered",
-    next_steps: "What are the next steps?",
-    reflection: "Personal reflection",
-  }
-  return placeholders[field] || "Enter value..."
-}
-
 // Register only when running inside Figma
 if (typeof figma !== "undefined" && figma.widget?.register) {
   figma.widget.register(Widget)
 }
 
-// Allow Next / browser imports: <Widget /> renders like a normal React component
+// Let Next.js (or any other bundler) import this file
 export default Widget

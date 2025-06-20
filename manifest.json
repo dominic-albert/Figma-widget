@@ -1,13 +1,10 @@
 {
   "name": "UX Documentation Hub",
-  "id": "ux-documentation-hub",
+  "id": "ux-documentation-hub-clean",
   "api": "1.0.0",
   "main": "widget.tsx",
   "capabilities": [],
   "enableProposedApi": false,
   "editorType": ["figma"],
-  "ui": "widget.tsx",
-  "networkAccess": {
-    "allowedDomains": ["none"]
-  }
+  "ui": "widget.tsx"
 }
