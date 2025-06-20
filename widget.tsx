@@ -1,78 +1,5 @@
 "use client"
 
-import React from "react"
-
-/* --------------------------------------------------------------------
-   BROWSER-ONLY STUB ─ lets Next.js preview render without the real
-   Figma runtime.  When the widget actually runs in Figma this block
-   is skipped because `window` is undefined in that sandbox.
----------------------------------------------------------------------*/
-if (
-  typeof window !== "undefined" && // we're in a browser
-  typeof (globalThis as any).figma === "undefined"
-) {
-  ;(globalThis as any).figma = {
-    widget: {
-      useSyncedState: <T,>(_: string, initial: T) => React.useState<T>(initial),
-      usePropertyMenu: () => {},
-      /* Very small visual shims so components still render in preview */
-      AutoLayout: ({
-        direction,
-        spacing = 4,
-        padding = 0,
-        fill,
-        stroke,
-        strokeWidth,
-        cornerRadius,
-        width,
-        onClick,
-        children,
-      }: any) => (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: direction === "horizontal" ? "row" : "column",
-            gap: spacing,
-            padding,
-            background: fill,
-            border: stroke ? `${strokeWidth ?? 1}px solid ${stroke}` : undefined,
-            borderRadius: cornerRadius,
-            width: width === "fill-parent" ? "100%" : width,
-          }}
-          onClick={onClick}
-        >
-          {children}
-        </div>
-      ),
-      Text: ({ fontSize, fontWeight, fill, onClick, children }: any) => (
-        <span style={{ fontSize, fontWeight, color: fill }} onClick={onClick}>
-          {children}
-        </span>
-      ),
-      Input: ({ value, placeholder, fontSize, onTextEditEnd }: any) => (
-        <input
-          style={{
-            fontSize,
-            padding: 4,
-            border: "1px solid #d1d5db",
-            borderRadius: 4,
-            width: "100%",
-          }}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onTextEditEnd?.({ characters: e.target.value })}
-        />
-      ),
-    },
-    currentUser: { name: "Preview User" },
-    currentPage: { selection: [] },
-    notify: (msg: string) => console.log(`[figma.notify] ${msg}`),
-  }
-}
-
-// Declare figma as a global variable to avoid linting errors when running outside of Figma
-declare var figma: any
-
 const { widget } = figma
 const { useSyncedState, usePropertyMenu, AutoLayout, Text, Input } = widget
 
@@ -165,7 +92,8 @@ function Widget() {
         propertyName: "export",
       },
     ],
-    ({ propertyName }) => {
+    (event) => {
+      const propertyName = event.propertyName
       if (propertyName && propertyName.startsWith("add-")) {
         const type = propertyName.replace("add-", "")
         startCreating(type)
@@ -327,23 +255,90 @@ function Widget() {
         />
 
         <AutoLayout direction="horizontal" spacing={4} width="fill-parent">
-          {["all", "decision", "rationale", "debt", "insight", "journal"].map((type) => (
-            <AutoLayout
-              key={type}
-              padding={{ horizontal: 8, vertical: 4 }}
-              fill={filterType === type ? "#3B82F6" : "#F3F4F6"}
-              cornerRadius={4}
-              onClick={() => setFilterType(type)}
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "all" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("all")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "all" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "all" ? 600 : 400}
             >
-              <Text
-                fontSize={10}
-                fill={filterType === type ? "#FFFFFF" : "#374151"}
-                fontWeight={filterType === type ? 600 : 400}
-              >
-                {type === "all" ? "All" : CATEGORY_CONFIG[type as keyof typeof CATEGORY_CONFIG]?.icon || type}
-              </Text>
-            </AutoLayout>
-          ))}
+              All
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "decision" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("decision")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "decision" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "decision" ? 600 : 400}
+            >
+              📝
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "rationale" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("rationale")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "rationale" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "rationale" ? 600 : 400}
+            >
+              🧠
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "debt" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("debt")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "debt" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "debt" ? 600 : 400}
+            >
+              🚩
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "insight" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("insight")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "insight" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "insight" ? 600 : 400}
+            >
+              🧪
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 4 }}
+            fill={filterType === "journal" ? "#3B82F6" : "#F3F4F6"}
+            cornerRadius={4}
+            onClick={() => setFilterType("journal")}
+          >
+            <Text
+              fontSize={10}
+              fill={filterType === "journal" ? "#FFFFFF" : "#374151"}
+              fontWeight={filterType === "journal" ? 600 : 400}
+            >
+              ✍️
+            </Text>
+          </AutoLayout>
         </AutoLayout>
       </AutoLayout>
 
@@ -402,19 +397,56 @@ function Widget() {
 
       {!isCreating && (
         <AutoLayout direction="horizontal" spacing={4} width="fill-parent">
-          {Object.entries(CATEGORY_CONFIG).map(([type, config]) => (
-            <AutoLayout
-              key={type}
-              padding={{ horizontal: 8, vertical: 6 }}
-              fill={config.color}
-              cornerRadius={4}
-              onClick={() => startCreating(type)}
-            >
-              <Text fontSize={10} fill="#FFFFFF">
-                {config.icon}
-              </Text>
-            </AutoLayout>
-          ))}
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 6 }}
+            fill="#3B82F6"
+            cornerRadius={4}
+            onClick={() => startCreating("decision")}
+          >
+            <Text fontSize={10} fill="#FFFFFF">
+              📝
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 6 }}
+            fill="#8B5CF6"
+            cornerRadius={4}
+            onClick={() => startCreating("rationale")}
+          >
+            <Text fontSize={10} fill="#FFFFFF">
+              🧠
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 6 }}
+            fill="#EF4444"
+            cornerRadius={4}
+            onClick={() => startCreating("debt")}
+          >
+            <Text fontSize={10} fill="#FFFFFF">
+              🚩
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 6 }}
+            fill="#10B981"
+            cornerRadius={4}
+            onClick={() => startCreating("insight")}
+          >
+            <Text fontSize={10} fill="#FFFFFF">
+              🧪
+            </Text>
+          </AutoLayout>
+          <AutoLayout
+            padding={{ horizontal: 8, vertical: 6 }}
+            fill="#F59E0B"
+            cornerRadius={4}
+            onClick={() => startCreating("journal")}
+          >
+            <Text fontSize={10} fill="#FFFFFF">
+              ✍️
+            </Text>
+          </AutoLayout>
         </AutoLayout>
       )}
 
@@ -473,10 +505,4 @@ function Widget() {
   )
 }
 
-// Register only when running inside Figma
-if (typeof figma !== "undefined" && figma.widget?.register) {
-  figma.widget.register(Widget)
-}
-
-// Let Next.js (or any other bundler) import this file
-export default Widget
+widget.register(Widget)
